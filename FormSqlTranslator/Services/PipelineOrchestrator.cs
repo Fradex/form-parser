@@ -9,6 +9,7 @@ public sealed class PipelineOrchestrator(
     SqlTranslatorClient translator,
     AnonymousBlockPostProcessor postProcessor,
     IntermediateArtifactService artifactService,
+    FormRewriter rewriter,
     ILogger<PipelineOrchestrator> logger)
 {
     public async Task RunAsync(CliOptions options, CancellationToken ct)
@@ -28,6 +29,8 @@ public sealed class PipelineOrchestrator(
                 var blocks = parser.ExtractBlocks(file);
                 logger.LogInformation("[EXTRACT] {File} -> {Count} blocks", file, blocks.Count);
 
+                var translatedByBlock = new Dictionary<string, string>(StringComparer.Ordinal);
+
                 foreach (var block in blocks.Where(b => !b.IsTranslatedBranch))
                 {
                     if (options.SaveIntermediate)
@@ -41,12 +44,26 @@ public sealed class PipelineOrchestrator(
                         await artifactService.SaveBlockAsync(options.Output, block, "30-translation", "postgres.raw.sql", translated, token);
 
                     var processed = postProcessor.Process(translated, block.BlockType == SqlBlockType.AnonymousBlock);
+                    translatedByBlock[block.BlockId] = processed;
                     if (options.SaveIntermediate)
                         await artifactService.SaveBlockAsync(options.Output, block, "40-postprocess", "postgres.processed.sql", processed, token);
 
-                    var outName = Path.Combine(options.Output, Path.GetFileName(file) + "." + block.Order + ".postgres.sql");
-                    await File.WriteAllTextAsync(outName, processed, token);
                     logger.LogInformation("[TRANSLATE] {File} block {BlockId} done", file, block.BlockId);
+                }
+
+                if (!options.DryRun)
+                {
+                    try
+                    {
+                        var rewritten = rewriter.Rewrite(original, translatedByBlock, blocks, options.Mode);
+                        var rewrittenPath = Path.Combine(options.Output, Path.GetFileName(file));
+                        await File.WriteAllTextAsync(rewrittenPath, rewritten, token);
+                        logger.LogInformation("[REWRITE] {File} saved to {OutFile}", file, rewrittenPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "[REWRITE] Skipped rewrite for non-xml form {File}", file);
+                    }
                 }
             }
             catch (Exception ex)

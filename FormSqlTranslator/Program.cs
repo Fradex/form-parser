@@ -13,6 +13,7 @@ services.AddSingleton<SqlBlockClassifier>();
 services.AddSingleton<FormParser>();
 services.AddSingleton<AnonymousBlockPostProcessor>();
 services.AddSingleton<IntermediateArtifactService>();
+services.AddSingleton<FormRewriter>();
 services.AddSingleton<PipelineOrchestrator>();
 
 using var provider = services.BuildServiceProvider();

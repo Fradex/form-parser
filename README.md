@@ -11,6 +11,7 @@ CLI tool skeleton for parsing `.frm/.php/.xml/.inc` forms, extracting Oracle SQL
 - translation client (`POST /sql`, `text/plain`, retry + timeout)
 - anonymous block post-processing to `DO $$ ... $$`
 - intermediate artifacts (`00-original`, `20-blocks`, `30-translation`, `40-postprocess`)
+- XML rewrite step that injects/updates POSTGRE ActionRouter/SubSelect branches (`mode=tmis|nmis|both`)
 
 ## Usage
 
