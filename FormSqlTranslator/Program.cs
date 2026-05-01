@@ -11,6 +11,8 @@ services.AddHttpClient<SqlTranslatorClient>();
 services.AddSingleton<FileDiscoveryService>();
 services.AddSingleton<SqlBlockClassifier>();
 services.AddSingleton<FormParser>();
+services.AddSingleton<AnonymousBlockPostProcessor>();
+services.AddSingleton<IntermediateArtifactService>();
 services.AddSingleton<PipelineOrchestrator>();
 
 using var provider = services.BuildServiceProvider();

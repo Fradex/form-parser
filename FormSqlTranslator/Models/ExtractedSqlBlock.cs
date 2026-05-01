@@ -15,4 +15,8 @@ public sealed record ExtractedSqlBlock(
     int Order,
     string Sql,
     string OriginPath,
-    SqlBlockType BlockType);
+    SqlBlockType BlockType,
+    bool IsTranslatedBranch)
+{
+    public string SafeFileId => BlockId.Replace(Path.DirectorySeparatorChar, '_').Replace(Path.AltDirectorySeparatorChar, '_');
+}

@@ -4,9 +4,6 @@ public sealed class SqlTranslatorClient(HttpClient httpClient)
 {
     public async Task<string> TranslateAsync(string translatorUrl, string sql, CancellationToken ct)
     {
-        using var content = new StringContent(sql);
-        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain");
-
         var delay = TimeSpan.FromMilliseconds(200);
         for (var attempt = 1; attempt <= 3; attempt++)
         {
@@ -15,6 +12,8 @@ public sealed class SqlTranslatorClient(HttpClient httpClient)
 
             try
             {
+                using var content = new StringContent(sql);
+                content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain");
                 var response = await httpClient.PostAsync(translatorUrl, content, timeoutCts.Token);
                 if (response.IsSuccessStatusCode)
                 {
