@@ -56,7 +56,8 @@ public sealed class PipelineOrchestrator(
                     try
                     {
                         var rewritten = rewriter.Rewrite(original, translatedByBlock, blocks, options.Mode);
-                        var rewrittenPath = Path.Combine(options.Output, Path.GetFileName(file));
+                        var rewrittenPath = GetOutputPath(options.Input, options.Output, file);
+                        Directory.CreateDirectory(Path.GetDirectoryName(rewrittenPath)!);
                         await File.WriteAllTextAsync(rewrittenPath, rewritten, token);
                         logger.LogInformation("[REWRITE] {File} saved to {OutFile}", file, rewrittenPath);
                     }
@@ -71,5 +72,18 @@ public sealed class PipelineOrchestrator(
                 logger.LogError(ex, "[ERROR] Failed to process {File}", file);
             }
         });
+    }
+
+    public static string GetOutputPath(string inputPath, string outputRoot, string filePath)
+    {
+        if (Directory.Exists(inputPath))
+        {
+            var root = Path.GetFullPath(inputPath);
+            var full = Path.GetFullPath(filePath);
+            var relative = Path.GetRelativePath(root, full);
+            return Path.Combine(outputRoot, relative);
+        }
+
+        return Path.Combine(outputRoot, Path.GetFileName(filePath));
     }
 }
