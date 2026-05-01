@@ -10,6 +10,7 @@ CLI tool skeleton for parsing `.frm/.php/.xml/.inc` forms, extracting Oracle SQL
 - SQL classification (`PlainSql` / `AnonymousBlock`)
 - translation client (`POST /sql`, `text/plain`, retry + timeout)
 - anonymous block post-processing to `DO $$ ... $$`
+- anonymous wrapper `CREATE OR REPLACE PROCEDURE/FUNCTION pg_temp.func_* ... CALL/SELECT pg_temp.func_*` is converted to `DO $$ ... $$`
 - intermediate artifacts (`00-original`, `20-blocks`, `30-translation`, `40-postprocess`)
 - XML rewrite step that injects/updates POSTGRE ActionRouter/SubSelect branches (`mode=tmis|nmis|both`)
 - out/ output preserves relative directory structure of files under the input root

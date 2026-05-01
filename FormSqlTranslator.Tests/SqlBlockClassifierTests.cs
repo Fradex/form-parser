@@ -1,6 +1,5 @@
 using FormSqlTranslator.Models;
 using FormSqlTranslator.Services;
-using Xunit;
 
 namespace FormSqlTranslator.Tests;
 
