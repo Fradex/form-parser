@@ -45,12 +45,12 @@ public sealed class FormRewriter
             .ToArray();
 
         var oracleBranch = FindOrCreateBranch(container, originalComponent, attributes, ConditionTemplateService.OracleCondition);
-        UpsertSqlNode(oracleBranch, originalSql);
+        UpsertSqlNode(oracleBranch, originalSql, replaceAllSqlNodes: false);
 
         foreach (var condition in ConditionTemplateService.BuildPostgresConditions(mode))
         {
             var pgBranch = FindOrCreateBranch(container, originalComponent, attributes, condition);
-            UpsertSqlNode(pgBranch, translatedSql);
+            UpsertSqlNode(pgBranch, translatedSql, replaceAllSqlNodes: true);
         }
 
         originalComponent.Remove();
@@ -90,9 +90,24 @@ public sealed class FormRewriter
             _ => throw new NotSupportedException($"Unsupported XML node type: {node.GetType().FullName}")
         };
 
-    private static void UpsertSqlNode(XElement branch, string sql)
+    private static void UpsertSqlNode(XElement branch, string sql, bool replaceAllSqlNodes)
     {
         var normalizedSql = "\n" + sql.Trim() + "\n";
+        if (replaceAllSqlNodes)
+        {
+            var sqlLikeNodes = branch.Nodes()
+                .Where(n => n is XCData || n is XText)
+                .ToList();
+
+            if (sqlLikeNodes.Count > 0)
+            {
+                sqlLikeNodes[0].ReplaceWith(new XCData(normalizedSql));
+                foreach (var node in sqlLikeNodes.Skip(1))
+                    node.Remove();
+                return;
+            }
+        }
+
         var cdataNode = branch.Nodes().OfType<XCData>().FirstOrDefault();
         if (cdataNode is not null)
         {
