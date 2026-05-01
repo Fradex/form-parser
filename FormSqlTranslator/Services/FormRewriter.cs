@@ -45,12 +45,12 @@ public sealed class FormRewriter
             .ToArray();
 
         var oracleBranch = FindOrCreateBranch(container, originalComponent, attributes, ConditionTemplateService.OracleCondition);
-        oracleBranch.ReplaceNodes(new XCData("\n" + originalSql.Trim() + "\n"));
+        UpsertSqlNode(oracleBranch, originalSql);
 
         foreach (var condition in ConditionTemplateService.BuildPostgresConditions(mode))
         {
             var pgBranch = FindOrCreateBranch(container, originalComponent, attributes, condition);
-            pgBranch.ReplaceNodes(new XCData("\n" + translatedSql.Trim() + "\n"));
+            UpsertSqlNode(pgBranch, translatedSql);
         }
 
         originalComponent.Remove();
@@ -67,10 +67,26 @@ public sealed class FormRewriter
         if (existing is not null)
             return existing;
 
-        var branch = new XElement("component", baseAttributes.Select(a => new XAttribute(a.Name, a.Value)));
+        var branch = new XElement(
+            "component",
+            baseAttributes.Select(a => new XAttribute(a.Name, a.Value)),
+            originalComponent.Nodes().Select(n => new XNode(n)));
         branch.SetAttributeValue("condition", condition);
 
         originalComponent.AddBeforeSelf(branch);
         return branch;
+    }
+
+    private static void UpsertSqlNode(XElement branch, string sql)
+    {
+        var normalizedSql = "\n" + sql.Trim() + "\n";
+        var cdataNode = branch.Nodes().OfType<XCData>().FirstOrDefault();
+        if (cdataNode is not null)
+        {
+            cdataNode.Value = normalizedSql;
+            return;
+        }
+
+        branch.Add(new XCData(normalizedSql));
     }
 }
