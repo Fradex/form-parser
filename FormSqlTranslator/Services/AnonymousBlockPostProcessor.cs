@@ -23,14 +23,15 @@ public sealed class AnonymousBlockPostProcessor
         if (match.Success && InvokeRegex.IsMatch(sql))
         {
             var declareBlock = BuildDeclareBlock(match.Groups["params"].Value);
-            var body = match.Groups["body"].Value.Trim();
+            var (localDeclare, statements) = ExtractBlockParts(match.Groups["body"].Value);
 
             var output = new StringBuilder();
             output.AppendLine("DO $$");
             output.AppendLine("DECLARE");
             output.Append(declareBlock);
+            output.Append(localDeclare);
             output.AppendLine("BEGIN");
-            output.AppendLine(body);
+            output.AppendLine(statements);
             output.AppendLine("END;");
             output.Append("$$;");
 
@@ -56,6 +57,36 @@ public sealed class AnonymousBlockPostProcessor
         }
 
         return sb.ToString();
+    }
+
+    private static (string declareBlock, string statements) ExtractBlockParts(string rawBody)
+    {
+        var body = rawBody.Trim();
+        var wrappedBlock = Regex.Match(
+            body,
+            @"^\s*(?:DECLARE\s*(?<declare>[\s\S]*?))?BEGIN\s*(?<statements>[\s\S]*?)\s*END\s*;?\s*$",
+            RegexOptions.IgnoreCase);
+
+        if (!wrappedBlock.Success)
+            return (string.Empty, body);
+
+        var localDeclare = wrappedBlock.Groups["declare"].Value.Trim();
+        var statements = wrappedBlock.Groups["statements"].Value.Trim();
+
+        if (string.IsNullOrWhiteSpace(localDeclare))
+            return (string.Empty, statements);
+
+        return ($"{IndentLines(localDeclare)}\n", statements);
+    }
+
+    private static string IndentLines(string block)
+    {
+        var lines = block.Replace("\r\n", "\n").Split('\n');
+        var sb = new StringBuilder();
+        foreach (var line in lines)
+            sb.Append("    ").AppendLine(line.TrimEnd());
+
+        return sb.ToString().TrimEnd();
     }
 
     private static string CleanupResidualWrapper(string sql)
