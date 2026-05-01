@@ -53,6 +53,7 @@ public sealed class AnonymousBlockPostProcessor
             if (string.IsNullOrWhiteSpace(cleaned))
                 continue;
 
+            cleaned = Regex.Replace(cleaned, @"\bPL2PG_VAR_(?<name>[A-Za-z0-9_]+)\b", "${name}", RegexOptions.IgnoreCase);
             sb.Append("    ").Append(cleaned).AppendLine(";");
         }
 
@@ -71,6 +72,7 @@ public sealed class AnonymousBlockPostProcessor
             return (string.Empty, body);
 
         var localDeclare = wrappedBlock.Groups["declare"].Value.Trim();
+        localDeclare = Regex.Replace(localDeclare, @"\bPL2PG_VAR_(?<name>[A-Za-z0-9_]+)\b", "${name}", RegexOptions.IgnoreCase);
         var statements = wrappedBlock.Groups["statements"].Value.Trim();
 
         if (string.IsNullOrWhiteSpace(localDeclare))
