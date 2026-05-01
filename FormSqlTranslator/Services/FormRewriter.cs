@@ -115,6 +115,26 @@ public sealed class FormRewriter
             return;
         }
 
+        var inlineSqlTextNode = branch.Nodes()
+            .OfType<XText>()
+            .FirstOrDefault(t => !string.IsNullOrWhiteSpace(t.Value) && LooksLikeSql(t.Value));
+        if (inlineSqlTextNode is not null)
+        {
+            inlineSqlTextNode.Value = normalizedSql;
+            return;
+        }
+
         branch.Add(new XCData(normalizedSql));
+    }
+
+    private static bool LooksLikeSql(string value)
+    {
+        var trimmed = value.TrimStart();
+        return trimmed.StartsWith("select", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("insert", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("update", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("delete", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("begin", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("declare", StringComparison.OrdinalIgnoreCase);
     }
 }
