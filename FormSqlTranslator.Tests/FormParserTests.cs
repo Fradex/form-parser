@@ -102,4 +102,35 @@ public class FormParserTests
             File.Delete(temp);
         }
     }
+
+    [Fact]
+    public void ExtractBlocks_ParsesSelectActionWithoutCdata_WhenContainsBeginAndPostMode()
+    {
+        var temp = Path.GetTempFileName();
+        try
+        {
+            var content = """
+<div>
+  <component cmptype="Action" name="SelectAction" mode="post">
+    begin
+      select t.ID into :ID from dual t;
+    end;
+    <component cmptype="ActionVar" name="ID" get="v0" src="ID" srctype="var" />
+  </component>
+</div>
+""";
+            File.WriteAllText(temp, content);
+
+            var parser = new FormParser(new SqlBlockClassifier());
+            var blocks = parser.ExtractBlocks(temp);
+
+            var action = Assert.Single(blocks.Where(b => b.ComponentType == "Action"));
+            Assert.Contains("begin", action.Sql, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("select t.ID into :ID", action.Sql, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            File.Delete(temp);
+        }
+    }
 }
