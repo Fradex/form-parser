@@ -26,3 +26,14 @@ dotnet run --project FormSqlTranslator -- \
   --save-intermediate true \
   --max-degree 4
 ```
+
+## Tests
+
+```bash
+dotnet test FormSqlTranslator.sln
+```
+
+Added tests:
+- `ConditionTemplateServiceTests`
+- `SqlBlockClassifierTests`
+- `AnonymousBlockPostProcessorTests`
