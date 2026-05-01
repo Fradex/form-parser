@@ -55,11 +55,26 @@ public sealed class FormRewriter
                 existing = new XElement("component",
                     new XAttribute("cmptype", branchType),
                     new XAttribute("condition", condition));
-                parent.Add(existing);
+                InsertBranch(parent, existing, condition);
             }
 
             existing.ReplaceNodes(new XCData("\n" + sql.Trim() + "\n"));
         }
+    }
+
+    private static void InsertBranch(XElement parent, XElement branch, string condition)
+    {
+        var oracleBranch = parent.Elements("component")
+            .FirstOrDefault(c => string.Equals((string?)c.Attribute("condition"), ConditionTemplateService.OracleCondition, StringComparison.Ordinal));
+
+        var isTmis = condition.Contains("MODE_DATABASE=tmis", StringComparison.OrdinalIgnoreCase);
+        if (isTmis && oracleBranch is not null)
+        {
+            oracleBranch.AddAfterSelf(branch);
+            return;
+        }
+
+        parent.Add(branch);
     }
 
     private static void EnsureOracleBranch(XElement parent)

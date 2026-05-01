@@ -38,5 +38,8 @@ public class FormRewriterTests
         Assert.Contains("condition=\"TYPE_DATABASE=ORACLE\"", rewritten);
         Assert.Contains("condition=\"TYPE_DATABASE=POSTGRE&amp;&amp;MODE_DATABASE=tmis\"", rewritten);
         Assert.DoesNotContain("MODE_DATABASE=nmis", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            "condition=\"TYPE_DATABASE=ORACLE\"[\\s\\S]*condition=\"TYPE_DATABASE=POSTGRE&amp;&amp;MODE_DATABASE=tmis\"",
+            rewritten);
     }
 }

@@ -9,14 +9,16 @@ public class AnonymousBlockPostProcessorTests
     [Fact]
     public void Process_TempWrapper_TransformsToDoBlockAndRemovesWrapperArtifacts()
     {
-        const string input = "CREATE OR REPLACE PROCEDURE pg_temp.func_x(INOUT A varchar, INOUT B bigint) AS $anonnym$\nDECLARE\n    npr numeric(17);\nBEGIN\n    A := '1';\nEND;\n$anonnym$ LANGUAGE plpgsql;\n\nCALL pg_temp.func_x(:A, :B);";
+        const string input = "CREATE OR REPLACE PROCEDURE pg_temp.func_x(INOUT PL2PG_VAR_D_NAME varchar, INOUT B bigint) AS $anonnym$\nDECLARE\n    PL2PG_VAR_LOCAL numeric(17);\nBEGIN\n    PL2PG_VAR_D_NAME := '1';\nEND;\n$anonnym$ LANGUAGE plpgsql;\n\nCALL pg_temp.func_x(:A, :B);";
 
         var processed = _postProcessor.Process(input, isAnonymous: true);
 
         Assert.StartsWith("DO $$", processed, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("DECLARE", processed);
-        Assert.Contains("A varchar;", processed);
+        Assert.Contains("D_NAME varchar;", processed);
         Assert.Contains("B bigint;", processed);
+        Assert.Contains("LOCAL numeric(17);", processed);
+        Assert.DoesNotContain("PL2PG_VAR_", processed, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("CREATE OR REPLACE PROCEDURE", processed, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("CALL pg_temp.func_x", processed, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("LANGUAGE plpgsql", processed, StringComparison.OrdinalIgnoreCase);
