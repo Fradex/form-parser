@@ -6,11 +6,7 @@ public static class ConditionTemplateService
     {
         "tmis" => ["TYPE_DATABASE=POSTGRE&&MODE_DATABASE=tmis"],
         "nmis" => ["TYPE_DATABASE=POSTGRE&&MODE_DATABASE=nmis"],
-        _ =>
-        [
-            "TYPE_DATABASE=POSTGRE&&MODE_DATABASE=tmis",
-            "TYPE_DATABASE=POSTGRE&&MODE_DATABASE=nmis"
-        ]
+        _ => ["TYPE_DATABASE=POSTGRE&&MODE_DATABASE=tmis"]
     };
 
     public static string OracleCondition => "TYPE_DATABASE=ORACLE";

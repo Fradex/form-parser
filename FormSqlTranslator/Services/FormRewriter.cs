@@ -41,6 +41,7 @@ public sealed class FormRewriter
 
     private static void UpsertBranch(XElement parent, string branchType, string sql, string mode)
     {
+        EnsureOracleBranch(parent);
         var conditions = ConditionTemplateService.BuildPostgresConditions(mode);
 
         foreach (var condition in conditions)
@@ -59,5 +60,28 @@ public sealed class FormRewriter
 
             existing.ReplaceNodes(new XCData("\n" + sql.Trim() + "\n"));
         }
+    }
+
+    private static void EnsureOracleBranch(XElement parent)
+    {
+        var existingOracle = parent.Elements("component")
+            .FirstOrDefault(c =>
+                string.Equals((string?)c.Attribute("condition"), ConditionTemplateService.OracleCondition, StringComparison.Ordinal));
+
+        if (existingOracle is not null)
+            return;
+
+        var originalSql = string.Concat(parent.Nodes().OfType<XCData>().Select(c => c.Value)).Trim();
+        if (string.IsNullOrWhiteSpace(originalSql))
+            return;
+
+        parent.Nodes().OfType<XCData>().Remove();
+
+        var oracleBranch = new XElement("component",
+            new XAttribute("cmptype", parent.Attribute("cmptype")?.Value ?? string.Empty),
+            new XAttribute("condition", ConditionTemplateService.OracleCondition),
+            new XCData("\n" + originalSql + "\n"));
+
+        parent.AddFirst(oracleBranch);
     }
 }

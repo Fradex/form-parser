@@ -5,13 +5,12 @@ namespace FormSqlTranslator.Tests;
 public class ConditionTemplateServiceTests
 {
     [Fact]
-    public void BuildPostgresConditions_Both_ReturnsTwoConditions()
+    public void BuildPostgresConditions_Both_ReturnsOnlyTmisCondition()
     {
         var conditions = ConditionTemplateService.BuildPostgresConditions("both");
 
-        Assert.Equal(2, conditions.Count);
-        Assert.Contains("TYPE_DATABASE=POSTGRE&&MODE_DATABASE=tmis", conditions);
-        Assert.Contains("TYPE_DATABASE=POSTGRE&&MODE_DATABASE=nmis", conditions);
+        var only = Assert.Single(conditions);
+        Assert.Equal("TYPE_DATABASE=POSTGRE&&MODE_DATABASE=tmis", only);
     }
 
     [Fact]
