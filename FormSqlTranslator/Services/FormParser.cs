@@ -12,7 +12,7 @@ public sealed class FormParser(SqlBlockClassifier classifier)
 
     private static readonly Regex AttrRegex = new("(?<name>\\w+)=\"(?<value>[^\"]*)\"", RegexOptions.Compiled);
     private static readonly Regex CDataRegex = new("<!\\[CDATA\\[(?<sql>.*?)\\]\\]>", RegexOptions.Singleline | RegexOptions.Compiled);
-    private static readonly Regex ScriptSqlRegex = new(@"(?<sql>(select|insert|update|delete|begin|declare)\b[\s\S]*?;)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ScriptSqlRegex = new(@"(?<sql>^\s*(select|insert|update|delete|begin|declare)\b[\s\S]*?;)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
     private static readonly Regex ScriptCallRegex = new(@"(?<sql>[A-Z][A-Z0-9_\.]*\s*\([^\)]*:[A-Z0-9_]+[^\)]*\))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public IReadOnlyList<ExtractedSqlBlock> ExtractBlocks(string filePath)
