@@ -14,18 +14,11 @@ public sealed class FormRewriter
             if (!translatedByBlockId.TryGetValue(block.BlockId, out var translatedSql))
                 continue;
 
-            var parent = FindMatchingComponent(doc, block);
-            if (parent is null)
+            var originalComponent = FindMatchingComponent(doc, block);
+            if (originalComponent is null)
                 continue;
 
-            if (block.ComponentType is "Action" or "ActionRouter")
-            {
-                UpsertBranch(parent, "ActionRouter", translatedSql, mode);
-            }
-            else if (block.ComponentType is "DataSet" or "SubSelect")
-            {
-                UpsertBranch(parent, "SubSelect", translatedSql, mode);
-            }
+            UpsertBranchesFromOriginal(originalComponent, block.Sql, translatedSql, mode);
         }
 
         return doc.ToString();
@@ -36,67 +29,48 @@ public sealed class FormRewriter
         return doc.Descendants("component")
             .FirstOrDefault(e =>
                 string.Equals((string?)e.Attribute("cmptype"), block.ComponentType, StringComparison.OrdinalIgnoreCase)
-                && string.Equals((string?)e.Attribute("name"), block.ComponentName, StringComparison.Ordinal));
+                && string.Equals((string?)e.Attribute("name"), block.ComponentName, StringComparison.Ordinal)
+                && e.Attribute("condition") is null);
     }
 
-    private static void UpsertBranch(XElement parent, string branchType, string sql, string mode)
+    private static void UpsertBranchesFromOriginal(XElement originalComponent, string originalSql, string translatedSql, string mode)
     {
-        EnsureOracleBranch(parent);
-        var conditions = ConditionTemplateService.BuildPostgresConditions(mode);
-
-        foreach (var condition in conditions)
-        {
-            var existing = parent.Elements("component").FirstOrDefault(c =>
-                string.Equals((string?)c.Attribute("cmptype"), branchType, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals((string?)c.Attribute("condition"), condition, StringComparison.Ordinal));
-
-            if (existing is null)
-            {
-                existing = new XElement("component",
-                    new XAttribute("cmptype", branchType),
-                    new XAttribute("condition", condition));
-                InsertBranch(parent, existing, condition);
-            }
-
-            existing.ReplaceNodes(new XCData("\n" + sql.Trim() + "\n"));
-        }
-    }
-
-    private static void InsertBranch(XElement parent, XElement branch, string condition)
-    {
-        var oracleBranch = parent.Elements("component")
-            .FirstOrDefault(c => string.Equals((string?)c.Attribute("condition"), ConditionTemplateService.OracleCondition, StringComparison.Ordinal));
-
-        var isTmis = condition.Contains("MODE_DATABASE=tmis", StringComparison.OrdinalIgnoreCase);
-        if (isTmis && oracleBranch is not null)
-        {
-            oracleBranch.AddAfterSelf(branch);
+        var container = originalComponent.Parent;
+        if (container is null)
             return;
+
+        var attributes = originalComponent.Attributes()
+            .Where(a => !string.Equals(a.Name.LocalName, "condition", StringComparison.OrdinalIgnoreCase))
+            .Select(a => new XAttribute(a.Name, a.Value))
+            .ToArray();
+
+        var oracleBranch = FindOrCreateBranch(container, originalComponent, attributes, ConditionTemplateService.OracleCondition);
+        oracleBranch.ReplaceNodes(new XCData("\n" + originalSql.Trim() + "\n"));
+
+        foreach (var condition in ConditionTemplateService.BuildPostgresConditions(mode))
+        {
+            var pgBranch = FindOrCreateBranch(container, originalComponent, attributes, condition);
+            pgBranch.ReplaceNodes(new XCData("\n" + translatedSql.Trim() + "\n"));
         }
 
-        parent.Add(branch);
+        originalComponent.Remove();
     }
 
-    private static void EnsureOracleBranch(XElement parent)
+    private static XElement FindOrCreateBranch(XElement container, XElement originalComponent, IReadOnlyList<XAttribute> baseAttributes, string condition)
     {
-        var existingOracle = parent.Elements("component")
-            .FirstOrDefault(c =>
-                string.Equals((string?)c.Attribute("condition"), ConditionTemplateService.OracleCondition, StringComparison.Ordinal));
+        var name = baseAttributes.FirstOrDefault(a => a.Name.LocalName == "name")?.Value;
+        var existing = container.Elements("component").FirstOrDefault(c =>
+            string.Equals((string?)c.Attribute("condition"), condition, StringComparison.Ordinal)
+            && string.Equals((string?)c.Attribute("name"), name, StringComparison.Ordinal)
+            && string.Equals((string?)c.Attribute("cmptype"), originalComponent.Attribute("cmptype")?.Value, StringComparison.OrdinalIgnoreCase));
 
-        if (existingOracle is not null)
-            return;
+        if (existing is not null)
+            return existing;
 
-        var originalSql = string.Concat(parent.Nodes().OfType<XCData>().Select(c => c.Value)).Trim();
-        if (string.IsNullOrWhiteSpace(originalSql))
-            return;
+        var branch = new XElement("component", baseAttributes.Select(a => new XAttribute(a.Name, a.Value)));
+        branch.SetAttributeValue("condition", condition);
 
-        parent.Nodes().OfType<XCData>().Remove();
-
-        var oracleBranch = new XElement("component",
-            new XAttribute("cmptype", parent.Attribute("cmptype")?.Value ?? string.Empty),
-            new XAttribute("condition", ConditionTemplateService.OracleCondition),
-            new XCData("\n" + originalSql + "\n"));
-
-        parent.AddFirst(oracleBranch);
+        originalComponent.AddBeforeSelf(branch);
+        return branch;
     }
 }
