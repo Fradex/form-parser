@@ -7,7 +7,7 @@ namespace FormSqlTranslator.Services;
 public sealed class FormParser(SqlBlockClassifier classifier)
 {
     private static readonly Regex ComponentRegex = new(
-        "<component\\s+[^>]*cmptype=\"(?<cmptype>DataSet|SubSelect|Action|ActionRouter|Script)\"[^>]*>(?<body>.*?)</component>",
+        "<(component|cmpAction|cmpDataSet)\\s+[^>]*(cmptype=\"(?<cmptype>DataSet|SubSelect|Action|ActionRouter|Script)\")?[^>]*>(?<body>.*?)</(component|cmpAction|cmpDataSet)>",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
 
     private static readonly Regex AttrRegex = new("(?<name>\\w+)=\"(?<value>[^\"]*)\"", RegexOptions.Compiled);
@@ -29,19 +29,15 @@ public sealed class FormParser(SqlBlockClassifier classifier)
         try
         {
             var doc = XDocument.Parse(text, LoadOptions.PreserveWhitespace | LoadOptions.SetLineInfo);
-            var nodes = doc.Descendants("component")
-                .Where(c =>
-                {
-                    var t = (string?)c.Attribute("cmptype");
-                    return t is "DataSet" or "SubSelect" or "Action" or "ActionRouter" or "Script";
-                })
+            var nodes = doc.Descendants()
+                .Where(IsSupportedSqlNode)
                 .ToList();
 
             var result = new List<ExtractedSqlBlock>();
             var i = 0;
             foreach (var n in nodes)
             {
-                var type = (string?)n.Attribute("cmptype") ?? "Unknown";
+                var type = ResolveComponentType(n);
                 var cdata = string.Concat(n.Nodes().OfType<XCData>().Select(c => c.Value)).Trim();
                 if (string.IsNullOrWhiteSpace(cdata))
                     continue;
@@ -67,6 +63,26 @@ public sealed class FormParser(SqlBlockClassifier classifier)
         }
     }
 
+    private static bool IsSupportedSqlNode(XElement element)
+    {
+        var name = element.Name.LocalName;
+        if (name.Equals("component", StringComparison.OrdinalIgnoreCase))
+        {
+            var t = (string?)element.Attribute("cmptype");
+            return t is "DataSet" or "SubSelect" or "Action" or "ActionRouter" or "Script";
+        }
+
+        return name is "cmpAction" or "cmpDataSet";
+    }
+
+    private static string ResolveComponentType(XElement element)
+    {
+        var name = element.Name.LocalName;
+        if (name.Equals("cmpAction", StringComparison.OrdinalIgnoreCase)) return "Action";
+        if (name.Equals("cmpDataSet", StringComparison.OrdinalIgnoreCase)) return "DataSet";
+        return (string?)element.Attribute("cmptype") ?? "Unknown";
+    }
+
     private IReadOnlyList<ExtractedSqlBlock> ParseFallback(string filePath, string text)
     {
         var result = new List<ExtractedSqlBlock>();
@@ -81,7 +97,8 @@ public sealed class FormParser(SqlBlockClassifier classifier)
             if (string.IsNullOrWhiteSpace(cdata))
                 continue;
 
-            var type = attrs.GetValueOrDefault("cmptype") ?? "Unknown";
+            var tagName = Regex.Match(header, @"<\s*(\w+)").Groups[1].Value;
+            var type = attrs.GetValueOrDefault("cmptype") ?? (tagName.Equals("cmpAction", StringComparison.OrdinalIgnoreCase) ? "Action" : tagName.Equals("cmpDataSet", StringComparison.OrdinalIgnoreCase) ? "DataSet" : "Unknown");
             if (type.Equals("Script", StringComparison.OrdinalIgnoreCase))
             {
                 foreach (var scriptSql in ExtractFromScript(cdata))

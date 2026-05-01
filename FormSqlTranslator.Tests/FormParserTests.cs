@@ -33,4 +33,34 @@ public class FormParserTests
             File.Delete(temp);
         }
     }
+
+    [Fact]
+    public void ExtractBlocks_ParsesActionBlockWithAnonymousSql()
+    {
+        var temp = Path.GetTempFileName();
+        try
+        {
+            var content = """
+<div>
+  <component cmptype="Action" name="SelectAction"><![CDATA[
+    begin
+      select dd.D_NAME into :D_NAME from D_V_DIS_DIAPASONES dd where dd.id=:ID;
+    end;
+  ]]></component>
+</div>
+""";
+            File.WriteAllText(temp, content);
+
+            var parser = new FormParser(new SqlBlockClassifier());
+            var blocks = parser.ExtractBlocks(temp);
+
+            var action = Assert.Single(blocks.Where(b => b.ComponentType == "Action"));
+            Assert.Contains("begin", action.Sql, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(Models.SqlBlockType.AnonymousBlock, action.BlockType);
+        }
+        finally
+        {
+            File.Delete(temp);
+        }
+    }
 }

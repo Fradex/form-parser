@@ -3,8 +3,9 @@
 The current implementation scope includes:
 
 1. Discovery of input files: `.frm`, `.php`, `.xml`, `.inc`.
-2. SQL extraction from components:
-   - `DataSet`, `SubSelect`, `Action`, `ActionRouter`, `Script`.
+2. SQL extraction from components/tags:
+   - `component[cmptype=DataSet|SubSelect|Action|ActionRouter|Script]`
+   - `cmpAction`, `cmpDataSet` (legacy tags mapped to Action/DataSet).
 3. SQL block classification:
    - `PlainSql`
    - `AnonymousBlock`
