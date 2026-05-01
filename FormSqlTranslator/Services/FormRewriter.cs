@@ -70,12 +70,25 @@ public sealed class FormRewriter
         var branch = new XElement(
             "component",
             baseAttributes.Select(a => new XAttribute(a.Name, a.Value)),
-            originalComponent.Nodes().Select(n => new XNode(n)));
+            originalComponent.Nodes().Select(CloneNode));
         branch.SetAttributeValue("condition", condition);
 
         originalComponent.AddBeforeSelf(branch);
         return branch;
     }
+
+
+    private static XNode CloneNode(XNode node) =>
+        node switch
+        {
+            XElement e => new XElement(e),
+            XCData c => new XCData(c.Value),
+            XText t => new XText(t.Value),
+            XComment c => new XComment(c.Value),
+            XProcessingInstruction p => new XProcessingInstruction(p.Target, p.Data),
+            XDocumentType d => new XDocumentType(d.Name, d.PublicId, d.SystemId, d.InternalSubset),
+            _ => throw new NotSupportedException($"Unsupported XML node type: {node.GetType().FullName}")
+        };
 
     private static void UpsertSqlNode(XElement branch, string sql)
     {
