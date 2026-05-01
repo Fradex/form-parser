@@ -24,6 +24,7 @@ public sealed class AnonymousBlockPostProcessor
         {
             var declareBlock = BuildDeclareBlock(match.Groups["params"].Value);
             var (localDeclare, statements) = ExtractBlockParts(match.Groups["body"].Value);
+            statements = NormalizePl2PgVariables(statements);
 
             var output = new StringBuilder();
             output.AppendLine("DO $$");
@@ -38,7 +39,7 @@ public sealed class AnonymousBlockPostProcessor
             return output.ToString().Trim();
         }
 
-        return CleanupResidualWrapper(sql);
+        return NormalizePl2PgVariables(CleanupResidualWrapper(sql));
     }
 
     private static string BuildDeclareBlock(string rawParams)
@@ -53,7 +54,7 @@ public sealed class AnonymousBlockPostProcessor
             if (string.IsNullOrWhiteSpace(cleaned))
                 continue;
 
-            cleaned = Regex.Replace(cleaned, @"\bPL2PG_VAR_(?<name>[A-Za-z0-9_]+)\b", "${name}", RegexOptions.IgnoreCase);
+            cleaned = NormalizePl2PgVariables(cleaned);
             sb.Append("    ").Append(cleaned).AppendLine(";");
         }
 
@@ -72,13 +73,18 @@ public sealed class AnonymousBlockPostProcessor
             return (string.Empty, body);
 
         var localDeclare = wrappedBlock.Groups["declare"].Value.Trim();
-        localDeclare = Regex.Replace(localDeclare, @"\bPL2PG_VAR_(?<name>[A-Za-z0-9_]+)\b", "${name}", RegexOptions.IgnoreCase);
+        localDeclare = NormalizePl2PgVariables(localDeclare);
         var statements = wrappedBlock.Groups["statements"].Value.Trim();
 
         if (string.IsNullOrWhiteSpace(localDeclare))
             return (string.Empty, statements);
 
         return ($"{IndentLines(localDeclare)}\n", statements);
+    }
+
+    private static string NormalizePl2PgVariables(string input)
+    {
+        return Regex.Replace(input, @"\bPL2PG_VAR_(?<name>[A-Za-z0-9_]+)\b", "${name}", RegexOptions.IgnoreCase);
     }
 
     private static string IndentLines(string block)
