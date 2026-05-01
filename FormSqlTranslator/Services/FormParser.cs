@@ -38,20 +38,25 @@ public sealed class FormParser(SqlBlockClassifier classifier)
             foreach (var n in nodes)
             {
                 var type = ResolveComponentType(n);
-                var cdata = string.Concat(n.Nodes().OfType<XCData>().Select(c => c.Value)).Trim();
-                if (string.IsNullOrWhiteSpace(cdata))
+                var sqlText = string.Concat(n.Nodes().OfType<XCData>().Select(c => c.Value)).Trim();
+                if (string.IsNullOrWhiteSpace(sqlText) && type.Equals("Action", StringComparison.OrdinalIgnoreCase))
+                {
+                    sqlText = ExtractActionInlineSql(n);
+                }
+
+                if (string.IsNullOrWhiteSpace(sqlText))
                     continue;
 
                 if (type.Equals("Script", StringComparison.OrdinalIgnoreCase))
                 {
-                    foreach (var scriptSql in ExtractFromScript(cdata))
+                    foreach (var scriptSql in ExtractFromScript(sqlText))
                     {
                         result.Add(BuildBlock(filePath, ++i, type, (string?)n.Attribute("name"), (string?)n.Attribute("condition"), scriptSql, n.GetAbsoluteXPath()));
                     }
                     continue;
                 }
 
-                result.Add(BuildBlock(filePath, ++i, type, (string?)n.Attribute("name"), (string?)n.Attribute("condition"), cdata, n.GetAbsoluteXPath()));
+                result.Add(BuildBlock(filePath, ++i, type, (string?)n.Attribute("name"), (string?)n.Attribute("condition"), sqlText, n.GetAbsoluteXPath()));
             }
 
             blocks = result;
@@ -93,22 +98,27 @@ public sealed class FormParser(SqlBlockClassifier classifier)
             var header = component.Value[..Math.Min(component.Value.Length, component.Value.IndexOf('>') + 1)];
             var attrs = AttrRegex.Matches(header).ToDictionary(m => m.Groups["name"].Value, m => m.Groups["value"].Value, StringComparer.OrdinalIgnoreCase);
             var body = component.Groups["body"].Value;
-            var cdata = string.Join("\n", CDataRegex.Matches(body).Select(x => x.Groups["sql"].Value.Trim())).Trim();
-            if (string.IsNullOrWhiteSpace(cdata))
-                continue;
-
             var tagName = Regex.Match(header, @"<\s*(\w+)").Groups[1].Value;
             var type = attrs.GetValueOrDefault("cmptype") ?? (tagName.Equals("cmpAction", StringComparison.OrdinalIgnoreCase) ? "Action" : tagName.Equals("cmpDataSet", StringComparison.OrdinalIgnoreCase) ? "DataSet" : "Unknown");
+            var sqlText = string.Join("\n", CDataRegex.Matches(body).Select(x => x.Groups["sql"].Value.Trim())).Trim();
+            if (string.IsNullOrWhiteSpace(sqlText) && type.Equals("Action", StringComparison.OrdinalIgnoreCase))
+            {
+                sqlText = ExtractActionInlineSql(body, attrs.GetValueOrDefault("name"), attrs.GetValueOrDefault("mode"));
+            }
+
+            if (string.IsNullOrWhiteSpace(sqlText))
+                continue;
+
             if (type.Equals("Script", StringComparison.OrdinalIgnoreCase))
             {
-                foreach (var scriptSql in ExtractFromScript(cdata))
+                foreach (var scriptSql in ExtractFromScript(sqlText))
                 {
                     result.Add(BuildBlock(filePath, ++i, type, attrs.GetValueOrDefault("name"), attrs.GetValueOrDefault("condition"), scriptSql, $"/fallback/component[{i}]"));
                 }
                 continue;
             }
 
-            result.Add(BuildBlock(filePath, ++i, type, attrs.GetValueOrDefault("name"), attrs.GetValueOrDefault("condition"), cdata, $"/fallback/component[{i}]"));
+            result.Add(BuildBlock(filePath, ++i, type, attrs.GetValueOrDefault("name"), attrs.GetValueOrDefault("condition"), sqlText, $"/fallback/component[{i}]"));
         }
 
         return result;
@@ -131,6 +141,33 @@ public sealed class FormParser(SqlBlockClassifier classifier)
         }
 
         return found.Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    private static string ExtractActionInlineSql(XElement action)
+    {
+        return ExtractActionInlineSql(
+            string.Concat(action.Nodes().OfType<XText>().Select(t => t.Value)),
+            (string?)action.Attribute("name"),
+            (string?)action.Attribute("mode"));
+    }
+
+    private static string ExtractActionInlineSql(string body, string? name, string? mode)
+    {
+        if (!string.Equals(name, "SelectAction", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(mode, "post", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        var beginIndex = body.IndexOf("begin", StringComparison.OrdinalIgnoreCase);
+        if (beginIndex < 0)
+            return string.Empty;
+
+        var endIndex = body.LastIndexOf("end;", StringComparison.OrdinalIgnoreCase);
+        if (endIndex < beginIndex)
+            return string.Empty;
+
+        return body.Substring(beginIndex, endIndex + "end;".Length - beginIndex).Trim();
     }
 
     private ExtractedSqlBlock BuildBlock(string filePath, int order, string type, string? name, string? condition, string sql, string originPath)
