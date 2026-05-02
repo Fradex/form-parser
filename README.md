@@ -29,6 +29,22 @@ dotnet run --project FormSqlTranslator -- \
   --max-degree 4
 ```
 
+## Standalone single-file build (without installing .NET on target machine)
+
+Build self-contained single-file binaries for Linux/Windows:
+
+```bash
+./build-standalone.sh
+```
+
+This command produces native executables in `./publish/<RID>` for:
+- `linux-x64`
+- `linux-arm64`
+- `win-x64`
+- `win-arm64`
+
+Resulting artifacts are self-contained: **the target machine does not need .NET installed**.
+
 ## Tests
 
 ```bash
